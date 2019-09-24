@@ -1,0 +1,40 @@
+(*
+    until => executa o estado em que está e transiciona para outro estado
+    unless => transiciona para outro estado e executa o novo estado
+*)
+
+node delayable(endd,start,c: bool) returns (statee,power:int)
+let
+    automaton
+     state Off do
+        statee = 0; 
+        power = 0; 
+     unless start then Water_Fill
+     state Water_Fill do
+        statee =1; 
+        power = 15; 
+     unless endd & c then Washing
+        | endd & not c then Standby
+     state Standby do
+        statee =2; 
+        power = 0; 
+     unless c then Washing
+     state Washing do
+        statee =3; 
+        power = 250; 
+     unless endd then Rinse
+     state Rinse do
+        statee =4; 
+        power = 200; 
+     unless endd then Spin
+     state Spin do
+        statee =5; 
+        power = 800; 
+     unless endd then Off
+    end 
+tel
+
+node twotasks(endd1,start1,c1: bool) returns (a1,b1: int)
+let
+    (a1,b1) = inlined delayable(endd1,start1,c1);
+tel
