@@ -1,0 +1,187 @@
+node washingMachine(endd, start, c: bool) returns (statee, power: int)
+let
+	automaton
+		state Off do
+			statee = 0;
+			power = 0;
+		unless start then WaterFill
+		state WaterFill do
+			statee = 1;
+			power = 15;
+		unless endd & not c then Standby
+			| endd & c then Washing
+		state Standby do
+			statee = 2;
+			power = 0;
+		unless c then Washing
+		state Washing do
+			statee = 3;
+			power = 250;
+		unless endd then Rinse
+		state Rinse do
+			statee = 4;
+			power = 200;
+		unless endd then Spin
+		state Spin do
+			statee = 5;
+			power = 800;
+		unless endd then Off
+	end
+tel
+
+node fonteLuz(turn_fonte_luz, c1, c2: bool) returns (statee: bool)
+let
+	automaton
+		state Off do
+			statee = false;
+		unless (turn_fonte_luz & c1) or not c2 then On
+		state On do
+			statee = true;
+		unless (turn_fonte_luz & c2) or not c1 then Off
+	end
+tel
+
+node radiator(up1, up2, down1, down2, c1, c2: bool) returns (statee, power: int)
+let
+	automaton
+		state Off do
+			statee = 0;
+			power = 0;
+		unless up1 or not c1 then FrostProtection
+		state FrostProtection do
+			statee = 1;
+			power = 300;
+		unless up1 & c1 then Eco
+			| down1 or not c1 then Off
+			| up2 & c2 then High
+		state Eco do
+			statee = 2;
+			power = 1500;
+		unless up2 & c2 then High
+			| down1 or not c1 then FrostProtection
+		state High do
+			statee = 3;
+			power = 2000;
+		unless down2 or not c2 then FrostProtection
+			| down1 or not c1 then Eco
+	end
+tel
+
+node oven(finish, start, c, cold, temp_ok: bool) returns (statee, power: int)
+let
+	automaton
+		state Off do
+			statee = 0;
+			power = 0;
+		unless start & not c then Standby
+			| start & c then Heat
+		state Standby do
+			statee = 1;
+			power = 0;
+		unless c then Heat
+		state Heat do
+			statee = 2;
+			power = 1500;
+		unless temp_ok then Maintain
+			| finish then Off
+		state Maintain do
+			statee = 3;
+			power = 300;
+		unless cold & c then Reheat
+			| finish then Off
+		state Reheat do
+			statee = 4;
+			power = 1000;
+		unless temp_ok then Maintain
+			| finish then Off
+	end
+tel
+
+node door(push, c_door: bool) returns (door_open: bool)
+let
+	automaton
+		state Close do
+			door_open = false;
+		unless push & c_door then Open
+		state Open do
+			door_open = true;
+		unless push or not c_door then Close
+	end
+tel
+
+node window(push, c_window: bool) returns (window_open: bool)
+let
+	automaton
+		state Close do
+			window_open = false;
+		unless push & c_window then Open
+		state Open do
+			window_open = true;
+		unless push or not c_window then Close
+	end
+tel
+
+node room(presence: bool) returns (room_oc: bool)
+let
+	automaton
+		state Empty do
+			room_oc = false;
+		unless presence then Ocupied
+		state Ocupied do
+			room_oc = true;
+		unless not presence then Empty
+	end
+tel
+
+type mp = MinimalSafety | Eco | Comfort
+
+node managementPolicy(eco_input, comfort_input: bool) returns (mp: mp)
+let
+	automaton
+		state MinimalSafety do
+			mp = MinimalSafety;
+		unless eco_input then Eco
+			| comfort_input then Comfort
+		state Eco do
+			mp = Eco;
+		unless not eco_input then MinimalSafety
+			| comfort_input then Comfort
+		state Comfort do
+			mp = Comfort;
+		unless not comfort_input then MinimalSafety
+			| eco_input then Eco
+	end
+tel
+
+node imputt(eco_input, comfort_input, presence, endd_wm, start_wm, up1_rd, up2_rd, down1_rd, down2_rd, finish_ov, start_ov, cold_ov, temp_ok_ov, push_dr, push_wd, turn_lamp, turn_tv: bool) returns (state_rad, power_rad, state_w_machine, power_w_machine, state_oven, power_oven: int; room_oc, door_open, window_open, state_lamp, state_tv: bool; policy: mp)
+	contract
+		var rule_1, rule_2, rule_3, rule_4, rule_policy: bool; engergy: int;
+
+	let
+		rule_1 = not room_oc or (state_lamp or state_tv);
+		rule_2 = not (not room_oc) or not(door_open or window_open);
+		rule_3 = not (door_open or window_open) or (state_rad < 2);
+		rule_4 = not (not room_oc) or not (state_lamp or state_tv)  & (state_rad < 2);
+
+		engergy = power_rad + power_w_machine + power_oven;
+
+		switch policy
+			| MinimalSafety do rule_policy = engergy <= 3000
+			| Eco do rule_policy = engergy <= 5000
+			| Comfort do rule_policy = engergy <= 7000
+		end
+	tel
+
+	enforce (rule_1 & rule_2 & rule_3 & rule_4 & rule_policy)
+	with (rad_off, rad_frost, c_w_machine, c_oven, c_door, c_window, c1_tv, c2_tv, c1_lamp, c2_lamp: bool)
+let
+	policy = inlined managementPolicy(eco_input, comfort_input);
+	room_oc = inlined room(presence);
+	(state_rad, power_rad) = inlined radiator(up1_rd, up2_rd, down1_rd, down2_rd, rad_off, rad_frost);
+	(state_w_machine, power_w_machine) = inlined washingMachine(endd_wm, start_wm, c_w_machine);
+	(state_oven, power_oven) = inlined oven(finish_ov, start_ov, c_oven, cold_ov, temp_ok_ov);
+	door_open = inlined door(push_dr, c_door);
+	window_open = inlined window(push_wd, c_window);
+	state_lamp = inlined fonteLuz(turn_lamp, c1_lamp, c2_lamp);
+	state_tv = inlined fonteLuz(turn_tv, c1_tv, c2_tv);
+tel
