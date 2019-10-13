@@ -1,0 +1,70 @@
+(*
+    until => executa o estado em que está e transiciona para outro estado
+    unless => transiciona para outro estado e executa o novo estado
+*)
+
+node waterBox(n1, n2, n3, n4, n5: bool) returns (statee: int)
+let
+	automaton
+		state Empty0 do
+			statee = 0;
+		unless n1 then Critical1
+		state Critical1 do
+			statee = 10;
+		unless n2 then Critical2
+			| not n1 then Empty0
+		state Critical2 do
+			statee = 20;
+		unless n3 then NeedWater3
+			| not n2 then Critical1
+		state NeedWater3 do
+			statee = 30;
+		unless n4 then NeedWater4
+			| not n3 then Critical2
+		state NeedWater4 do
+			statee = 41;
+		unless n5 then Full5
+			| not n4 then NeedWater3
+		state Full5 do
+			statee = 50;
+		unless not n5 then NoNeedWater4
+		state NoNeedWater4 do
+			statee = 42;
+		unless n5 then Full5
+			| not n4 then NeedWater3
+	end
+tel
+
+node deviceLed(c: bool) returns (statee: bool)
+let
+	automaton
+		state Off do
+			statee = false;
+		unless c then On
+		state On do
+			statee = true;
+		unless not c then Off
+	end
+tel
+
+node main(n1_wBox, n2_wBox, n3_wBox, n4_wBox, n5_wBox: bool) returns (state_wBox: int; state_led1, state_led2, state_led3, state_led4, state_led5: bool)
+	contract
+		var rule1, rule2, rule3, rule4, rule5: bool;
+	let
+		rule1 = not (state_wBox < 10) or not state_led1;
+		rule2 = not (state_wBox < 20) or not state_led2;
+		rule3 = not (state_wBox < 30) or not state_led3;
+		rule4 = not (state_wBox < 40) or not state_led4;
+		rule5 = not (state_wBox < 50) or not state_led5;
+	tel
+
+	enforce (rule1 & rule2 & rule3 & rule4 & rule5)
+	with (c_led1, c_led2, c_led3, c_led4, c_led5: bool)
+let
+    state_wBox = inlined waterBox(n1_wBox, n2_wBox, n3_wBox, n4_wBox, n5_wBox);
+    state_led1 = inlined deviceLed(c_led1);
+    state_led2 = inlined deviceLed(c_led2);
+    state_led3 = inlined deviceLed(c_led3);
+    state_led4 = inlined deviceLed(c_led4);
+    state_led5 = inlined deviceLed(c_led5);
+tel
