@@ -1,0 +1,171 @@
+(*
+    until => executa o estado em que está e transiciona para outro estado
+    unless => transiciona para outro estado e executa o novo estado
+*)
+
+node waterBox(n1, n2, n3, n4, n5: bool) returns (statee: int)
+let
+	automaton
+		state Empty0 do
+			statee = 01;
+		unless n1 then Critical1
+		state Critical1 do
+			statee = 11;
+		unless n2 then Critical2
+			| not n1 then EmptyWarn0
+		state Critical2 do
+			statee = 21;
+		unless n3 then NeedWater3
+			| not n2 then CriticalWarn1
+		state NeedWater3 do
+			statee = 30;
+		unless n4 then NeedWater4
+			| not n3 then CriticalWarn2
+		state NeedWater4 do
+			statee = 41;
+		unless n5 then Full5
+			| not n4 then NeedWater3
+		state Full5 do
+			statee = 50;
+		unless not n5 then NoNeedWater4
+		state NoNeedWater4 do
+			statee = 42;
+		unless n5 then Full5
+			| not n4 then NeedWater3
+		state CriticalWarn2 do
+			statee = 22;
+		unless n3 then NeedWater3
+			| not n2 then CriticalWarn1
+		state CriticalWarn1 do
+			statee = 12;
+		unless n2 then Critical2
+			| not n1 then EmptyWarn0
+		state EmptyWarn0 do
+			statee = 02;
+		unless n1 then Critical1
+	end
+tel
+
+node deviceLed(c: bool) returns (statee: bool)
+let
+	automaton
+		state Off do
+			statee = false;
+		unless c then On
+		state On do
+			statee = true;
+		unless not c then Off
+	end
+tel
+
+node wellPump(maintenance, c: bool) returns (statee: int)
+let
+	automaton
+		state Off do
+			statee = 0;
+		unless maintenance then Maintenance
+			| c then On
+		state On do
+			statee = 1;
+		unless maintenance then Maintenance
+			| not c then Off
+		state Maintenance do
+			statee = 2;
+		unless not maintenance then Off
+	end
+tel
+
+node deviceWarning(c: bool) returns (statee: bool)
+let
+	automaton
+		state Off do
+			statee = false;
+		unless c then On
+		state On do
+			statee = true;
+		unless not c then Off
+	end
+tel
+
+node deviceCable(n1, n2, n3, n4, n5: bool) returns (statee: int)
+let
+	automaton
+		state Normal do
+			statee = 0;
+		unless n5 & not(n1 or n2 or n3 or n4) then BrokenFull
+			| (not(n1) & n2) or 
+				((not(n1) or not(n2)) & n3) or 
+				((not(n1) or not(n2) or not(n3)) & n4) or 
+				((not(n1) or not(n2) or not(n3) or not(n4)) & n5) then BrokenPartial
+		state BrokenPartial do
+			statee = 1;
+		unless n5 & not(n1 or n2 or n3 or n4) then BrokenFull
+			| not(n1 or n2 or n3 or n4 or n5) or 
+				(n1 & not(n2 or n3 or n4 or n5)) or 
+				(n1 & n2 & not(n3 or n4 or n5)) or 
+				(n1 & n2 & n3 & not(n4 or n5)) or 
+				(n1 & n2 & n3 & n4 & not(n5)) or 
+				(n1 & n2 & n3 & n4 & n5) then Normal
+		state BrokenFull do
+			statee = 2;
+		unless (not(n1 or n2 or n3 or n4 or n5)) or 
+			(n1 & not(n2 or n3 or n4 or n5)) or 
+			(n1 & n2 & not(n3 or n4 or n5)) or 
+			(n1 & n2 & n3 & not(n4 or n5)) or 
+			(n1 & n2 & n3 & n4 & not(n5)) or 
+			(n1 & n2 & n3 & n4 & n5) then Normal
+			| (not(n1) & n2) or 
+				((not(n1) or not(n2)) & n3) or 
+				((not(n1) or not(n2) or not(n3)) & n4) or 
+				((not(n1) or not(n2) or not(n3) or not(n4)) & n5) then BrokenPartial
+	end
+tel
+
+node flowSensor(flow: bool) returns (statee: bool)
+let
+	automaton
+		state Off do
+			statee = false;
+		unless flow then On
+		state On do
+			statee = true;
+		unless not flow then Off
+	end
+tel
+
+node main(n1_wBox, n2_wBox, n3_wBox, n4_wBox, n5_wBox, maint_wPump, flow_fSensor: bool) 
+	returns (state_wBox, state_wellPump, state_cable_wBox: int; state_led_wBox1, state_led_wBox2, state_led_wBox3, state_led_wBox4, state_led_wBox5, state_led_maint_wPump, state_warn_critical_wBox2, state_warn_critical_wBox1, state_warn_empty_wBox0, state_fSensor: bool)
+	contract
+		var rule01, rule02, rule03, rule04, rule05, rule06, rule07, rule08, rule09, rule10, rule11, rule12: bool;
+	let
+		rule01 = not (state_wBox < 10) or not state_led_wBox1; (*Regra acender led da caixa nível 1*)
+		rule02 = not (state_wBox < 20) or not state_led_wBox2; (*Regra acender led da caixa nível 2*)
+		rule03 = not (state_wBox < 30) or not state_led_wBox3; (*Regra acender led da caixa nível 3*)
+		rule04 = not (state_wBox < 40) or not state_led_wBox4; (*Regra acender led da caixa nível 4*)
+		rule05 = not (state_wBox < 50) or not state_led_wBox5; (*Regra acender led da caixa nível 5*)
+		rule06 = not (state_wellPump < 2) or not state_led_maint_wPump; (*Regra acender led bomba poço em manutenção*)
+		rule07 = not (state_wBox > 41) or not (state_wellPump = 1); (*Regra ligar ou desligar bomba poço por nivel de agua*)
+		rule08 = not (state_wBox < 22 or state_wBox > 22) or not state_warn_critical_wBox2; (*Regra emitir alerta de nivel critico 2*)
+		rule09 = not (state_wBox < 12 or state_wBox > 12) or not state_warn_critical_wBox1; (*Regra emitir alerta de nivel critico 1*)
+		rule10 = not (state_wBox < 02 or state_wBox > 02) or not state_warn_empty_wBox0; (*Regra emitir alerta de vazio 0*)
+		rule11 = not (state_cable_wBox > 0) or not (state_wellPump = 1); (*Regra ligar ou desligar bomba poço por situação do cabo*)
+		rule12 = not (not state_fSensor) or not (state_wellPump = 1); (*Regra ligar ou desligar bomba poço por sensor fluxo*)
+	tel
+
+	enforce (rule01 & rule02 & rule03 & rule04 & rule05 & rule06 & rule07 & rule08 & rule09 & rule10 & rule11 & rule12)
+	with (c_led_wBox1, c_led_wBox2, c_led_wBox3, c_led_wBox4, c_led_wBox5, c_wPump, c_led_maint_wPump, c_warn_critical_wBox2, c_warn_critical_wBox1, c_warn_empty_wBox0: bool)
+let
+    state_wBox = inlined waterBox(n1_wBox, n2_wBox, n3_wBox, n4_wBox, n5_wBox);
+    state_led_wBox1 = inlined deviceLed(c_led_wBox1);
+    state_led_wBox2 = inlined deviceLed(c_led_wBox2);
+    state_led_wBox3 = inlined deviceLed(c_led_wBox3);
+    state_led_wBox4 = inlined deviceLed(c_led_wBox4);
+    state_led_wBox5 = inlined deviceLed(c_led_wBox5);
+    state_wellPump = inlined wellPump(maint_wPump, c_wPump);
+    state_led_maint_wPump = inlined deviceLed(c_led_maint_wPump);
+    state_warn_critical_wBox2 = inlined deviceWarning(c_warn_critical_wBox2);
+    state_warn_critical_wBox1 = inlined deviceWarning(c_warn_critical_wBox1);
+    state_warn_empty_wBox0 = inlined deviceWarning(c_warn_empty_wBox0);
+    state_cable_wBox = inlined deviceCable(n1_wBox, n2_wBox, n3_wBox, n4_wBox, n5_wBox);
+    state_fSensor = inlined flowSensor(flow_fSensor);
+tel
